@@ -8,10 +8,13 @@ This collector will inspect a directory containing rsnapshot logs and post the l
 #### Puppet implementation
 
 * install garethr/garethr-diamond module
-
-  ```# mod for managing diamond
-  mod 'garethr-diamond',
-    :git    => 'https://github.com/fasrc/garethr-diamond.git',
+  
+  ```
+  # mod for managing diamond
+    mod 'garethr-diamond',
+      :git    => 'https://github.com/fasrc/garethr-diamond.git',
+  ```
+  
 * configuration in yaml format:
 
   ```---
