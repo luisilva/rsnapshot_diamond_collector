@@ -28,6 +28,7 @@ This collector will inspect a directory containing rsnapshot logs and post the l
       'rsnapshot_diamond_collector':
         repo_url: 'https://github.com/fasrc/rsnapshot_diamond_collector.git'
         repo_revision: 'master'
+ ```
 #### Manual install
 
 * installing diamond
@@ -46,6 +47,7 @@ This collector will inspect a directory containing rsnapshot logs and post the l
   ```enabled=True
   path_prefix = <prefix_path>
   rsnap_log_home = </var/log/rsnapshot> 
+  ```
 * Add the script to diamond collectors repository section:
 
 `CentOS => /usr/share/diamond/collectors/rsnapshotruntimecollector/rsnapshotruntimecollector.py`
