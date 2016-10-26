@@ -3,46 +3,45 @@
 """
 rsnapshot_runtime_diamond.py
 A script that parses rsnapshot logs to determine runtimes between
-rsnapshot execution to it's completion. 
-
-self.publish(metric, value)
+rsnapshot execution to it's completion.
 """
 
 import sys
 import os
-import argparse
 import logging
 import time
-import socket
-import pickle
 from subprocess import Popen, PIPE
 from datetime import datetime
 import diamond.collector
 
+
 class RsnapshotRuntimeCollector(diamond.collector.Collector):
     def get_default_config_help(self):
+        """
+        Seting up help values for custom entry
+        """
         config_help = super(RsnapshotRuntimeCollector,
                             self).get_default_config_help()
         config_help.update({
             'rsnap_log_home':
-                'Path to base directory of rsnap logs'
-        ' name. Defaults to "%s"' % RSNAP_LOG_HOME,
+            'Path to base directory of rsnap logs'
+            ' name. Defaults to "%s"' % RSNAP_LOG_HOME,
         })
         return config_help
-         
+
     def get_default_config(self):
         """
         Returns the default collector settings
         """
         config = super(RsnapshotRuntimeCollector, self).get_default_config()
         config.update({
-	    'rsnap_log_home': None,
+            'rsnap_log_home': None,
         })
         return config
 
     def get_log_list(self, rsnap_log_home):
-        """     
-        Get the list of rsnapshot log from /var/log/
+        """
+        Get the list of rsnapshot logs from log location (rsnap_log_home)
         """
         ls_log = "ls %s" % rsnap_log_home
         ls_log_cmd = ls_log.split()
@@ -55,15 +54,20 @@ class RsnapshotRuntimeCollector(diamond.collector.Collector):
                 self.log.debug("No list infromation was returned.")
             elif logs_err.rstrip():
                 self.log.critical("Hostname command error "
-                                "(hostname -s): <<%s>>" % logs_err)
+                                  "(hostname -s): <<%s>>" % logs_err)
             log_list = logs_out
             return log_list
         except Exception as e:
             self.log.critical("Caught and exception running"
-                            " list command (ls rsnap_log_home)!")
+                              " list command (ls rsnap_log_home)!")
             self.log.critical("%s" % e)
 
     def get_job_times(self, log_path):
+        """
+        getting the date stamp data from the log lines that
+        coinside with rsnap run start times and rsnap run
+        completion times. Then converting them using datetime().
+        """
         self.log.debug("looking at log: %s" % log_path)
         date_format = "%d/%b/%Y:%H:%M:%S"
         start_times = []
@@ -88,14 +92,16 @@ class RsnapshotRuntimeCollector(diamond.collector.Collector):
         return [start_times, end_times]
 
     def parse_job_durations(self, log_path, start_times, end_times):
-        graph_list = []
+        """
+        Getting the delta between start and stop times.
+        """
         log_name = log_path.split('/')[-1].replace(".log", "")
         if len(start_times) == (len(end_times) + 1):
             del start_times[-1]
         self.log.debug("Lenght of Rsnap start "
-                     "times: %s" % (len(start_times)))
+                       "times: %s" % (len(start_times)))
         self.log.debug("Lenght of Rsnap start "
-                     "times: %s" % (len(end_times)))
+                       "times: %s" % (len(end_times)))
         if len(start_times) == len(end_times) and \
            len(start_times) != 0 or len(end_times) != 0:
             duration = [end_i - start_i for end_i, start_i in
@@ -103,30 +109,27 @@ class RsnapshotRuntimeCollector(diamond.collector.Collector):
             for end, times in zip(end_times, duration):
                 end_epoch = end.strftime('%s')
                 metric = self.total_secs(times)
-                ## This only works in Python 2.7.x
-                #metric = int(times.total_seconds())
-                #graph_list = "%s %s %s\n" \
-                #    % (log_name, metric, end_epoch)
-                #graph_list.append(graph_list)
-        return [log_name, metric]   
+        return [log_name, metric]
         if len(start_times) > (len(end_times) + 1):
-            self.log.critical("Can't parse this logs properly. You may want to "
-                            "clear it.: %s" % log_path)
+            self.log.critical("Can't parse this logs properly."
+                              " You may want to clear it.: %s" % log_path)
 
     def total_secs(self, times):
+        """
+        Converting to data into total seconds
+        """
         metric = int((times.days * 86400) + times.seconds)
         return metric
 
-    def collect(self): 
+    def collect(self):
+        """
+        Looping over all rsnap logs and publishing deltas
+        """
         self.log_list = self.get_log_list(self.config['rsnap_log_home'])
         for log in self.log_list.splitlines():
-            self.log_path = os.path.join(self.config['rsnap_log_home'], log) 
+            self.log_path = os.path.join(self.config['rsnap_log_home'], log)
             start_times, end_times = self.get_job_times(self.log_path)
-            #for i in range(0, len(start_times)):
-            #    self.log.debug("%s: %s" % (i, start_times[i]))
-            #for i in range(0, len(end_times)):
-            #    self.log.debug("%s: %s" % (i, end_times[i]))
-            metric_name, metric_value = self.parse_job_durations(self.log_path, start_times, end_times)
-            #log.self.debug("publishing: %s %s", %(log_name, metric_value))
+            metric_name, metric_value = \
+                self.parse_job_durations(self.log_path, start_times, end_times)
             if metric_value > 0:
-	        self.publish(metric_name , metric_value)
+                self.publish(metric_name, metric_value)
