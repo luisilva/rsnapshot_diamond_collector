@@ -24,10 +24,9 @@ This collector will inspect a directory containing rsnapshot logs and post the l
         path_prefix: "diamond.%{::datacenter}"
         rsnap_log_home: "/var/log/rsnapshot"
   profiles::diamond::collector_installs:
-    'RsnapshotRuntimeCollector':
-      'rsnapshot_diamond_collector':
-        repo_url: 'https://github.com/fasrc/rsnapshot_diamond_collector.git'
-        repo_revision: 'master'
+    'rsnapshot_diamond_collector':
+      repo_url: 'https://github.com/fasrc/rsnapshot_diamond_collector.git'
+      repo_revision: 'master'
  ```
 #### Manual install
 
