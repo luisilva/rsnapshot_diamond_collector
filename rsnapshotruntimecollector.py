@@ -6,10 +6,8 @@ A script that parses rsnapshot logs to determine runtimes between
 rsnapshot execution to it's completion.
 """
 
-import sys
 import os
 import logging
-import time
 from subprocess import Popen, PIPE
 from datetime import datetime
 import diamond.collector
@@ -39,97 +37,30 @@ class RsnapshotRuntimeCollector(diamond.collector.Collector):
         })
         return config
 
-    def get_log_list(self, rsnap_log_home):
-        """
-        Get the list of rsnapshot logs from log location (rsnap_log_home)
-        """
-        ls_log = "ls %s" % rsnap_log_home
-        ls_log_cmd = ls_log.split()
-        try:
-            logs = Popen(ls_log_cmd, stdout=PIPE, stderr=PIPE)
-            logs_out, logs_err = logs.communicate()
-            if not logs_out and not logs_err:
-                self.log.debug("list command returned Null Output or Errors.")
-            elif not logs_out:
-                self.log.debug("No list infromation was returned.")
-            elif logs_err.rstrip():
-                self.log.critical("Hostname command error "
-                                  "(hostname -s): <<%s>>" % logs_err)
-            log_list = logs_out
-            return log_list
-        except Exception as e:
-            self.log.critical("Caught and exception running"
-                              " list command (ls rsnap_log_home)!")
-            self.log.critical("%s" % e)
-
-    def get_job_times(self, log_path):
-        """
-        getting the date stamp data from the log lines that
-        coinside with rsnap run start times and rsnap run
-        completion times. Then converting them using datetime().
-        """
-        self.log.debug("looking at log: %s" % log_path)
-        date_format = "%d/%b/%Y:%H:%M:%S"
-        start_times = []
-        end_times = []
-        echo_count = 0
-        with open(log_path) as f:
-            for line in f:
-                if 'echo' in line:
-                    echo_count += 1
-                    start_date = line.split()[0].strip("[").strip("]")
-                    startd = datetime.strptime(start_date, date_format)
-                    start_times.append(startd)
-                elif '.pid' in line and 'rm' in line:
-                    if echo_count > 1:
-                        echo_pop = echo_count - 1
-                        for count in range(echo_pop):
-                            del start_times[-2]
-                    echo_count = 0
-                    end_date = line.split()[0].strip("[").strip("]")
-                    endd = datetime.strptime(end_date, date_format)
-                    end_times.append(endd)
-        return [start_times, end_times]
-
-    def parse_job_durations(self, log_path, start_times, end_times):
-        """
-        Getting the delta between start and stop times.
-        """
-        log_name = log_path.split('/')[-1].replace(".log", "")
-        if len(start_times) == (len(end_times) + 1):
-            del start_times[-1]
-        self.log.debug("Lenght of Rsnap start "
-                       "times: %s" % (len(start_times)))
-        self.log.debug("Lenght of Rsnap start "
-                       "times: %s" % (len(end_times)))
-        if len(start_times) == len(end_times) and \
-           len(start_times) != 0 or len(end_times) != 0:
-            duration = [end_i - start_i for end_i, start_i in
-                        zip(end_times, start_times)]
-            for end, times in zip(end_times, duration):
-                end_epoch = end.strftime('%s')
-                metric = self.total_secs(times)
-        return [log_name, metric]
-        if len(start_times) > (len(end_times) + 1):
-            self.log.critical("Can't parse this logs properly."
-                              " You may want to clear it.: %s" % log_path)
-
-    def total_secs(self, times):
-        """
-        Converting to data into total seconds
-        """
-        metric = int((times.days * 86400) + times.seconds)
-        return metric
-
     def collect(self):
         """
         Looping over all rsnap logs and publishing deltas
         """
-        self.log_list = self.get_log_list(self.config['rsnap_log_home'])
-        for log in self.log_list.splitlines():
-            self.log_path = os.path.join(self.config['rsnap_log_home'], log)
-            start_times, end_times = self.get_job_times(self.log_path)
-            metric_name, metric_value = \
-                self.parse_job_durations(self.log_path, start_times, end_times)
-            if metric_value > 0:
-                self.publish(metric_name, metric_value)
+        date_format = "%d/%b/%Y:%H:%M:%S"
+        root_dir = self.config['rsnap_log_home']
+        metrics = {}
+        for log in sorted(os.listdir(root_dir)):
+            for line in reversed(open(os.path.join(root_dir, log)).readlines()):
+                if '.pid' in line and 'rm' in line:
+                    end_date = line.split()[0].strip("[").strip("]")
+                    endd = datetime.strptime(end_date, date_format)
+                elif 'echo' in line and '.pid' in line:
+                    start_date = line.split()[0].strip("[").strip("]")
+                    startd = datetime.strptime(start_date, date_format)
+                    break
+            if endd and startd:
+              duration = endd - startd
+              metric_value = abs(int((duration.days * 86400) + duration.seconds))
+              metrics[os.path.splitext(log)[0]] = metric_value
+            elif startd:
+              endd = datetime.datetime.now(date_format)
+              duration = endd - startd
+              metric_value = abs(int((duration.days * 86400) + duration.seconds))
+              metrics[os.path.splitext(log)[0]] = metric_value
+        for metric_name, metric_value in metrics.iteritems():
+            self.publish(metric_name, metric_value)
