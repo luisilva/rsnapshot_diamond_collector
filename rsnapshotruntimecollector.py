@@ -45,7 +45,8 @@ class RsnapshotRuntimeCollector(diamond.collector.Collector):
         root_dir = self.config['rsnap_log_home']
         metrics = {}
         for log in sorted(os.listdir(root_dir)):
-            for line in reversed(open(os.path.join(root_dir, log)).readlines()):
+            for line in reversed(open(os.path.join(root_dir, log))
+                                 .readlines()):
                 if '.pid' in line and 'rm' in line:
                     end_date = line.split()[0].strip("[").strip("]")
                     endd = datetime.strptime(end_date, date_format)
@@ -54,13 +55,15 @@ class RsnapshotRuntimeCollector(diamond.collector.Collector):
                     startd = datetime.strptime(start_date, date_format)
                     break
             if endd and startd:
-              duration = endd - startd
-              metric_value = abs(int((duration.days * 86400) + duration.seconds))
-              metrics[os.path.splitext(log)[0]] = metric_value
+                duration = endd - startd
+                metric_value = abs(int((duration.days * 86400) +
+                                       duration.seconds))
+                metrics[os.path.splitext(log)[0]] = metric_value
             elif startd:
-              endd = datetime.datetime.now(date_format)
-              duration = endd - startd
-              metric_value = abs(int((duration.days * 86400) + duration.seconds))
-              metrics[os.path.splitext(log)[0]] = metric_value
+                endd = datetime.datetime.now(date_format)
+                duration = endd - startd
+                metric_value = abs(int((duration.days * 86400) +
+                                       duration.seconds))
+                metrics[os.path.splitext(log)[0]] = metric_value
         for metric_name, metric_value in metrics.iteritems():
             self.publish(metric_name, metric_value)
