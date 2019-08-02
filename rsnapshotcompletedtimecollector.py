@@ -2,8 +2,8 @@
 
 """
 rsnapshot_runtime_diamond.py
-A script that parses rsnapshot logs to determine runtimes between
-rsnapshot execution to it's completion.
+A script that parses rsnapshot logs to determine last completion date and
+time of any runs.
 """
 
 import os
